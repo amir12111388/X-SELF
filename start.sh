@@ -1,15 +1,12 @@
 #!/bin/bash
 
+echo "Enabling Helper..."
+
+python enable_helper.py
+
 echo "Starting Helper Bot..."
 
-python helper_bot.py \
-  --data-dir "$(pwd)/data" \
-  --status-file "$(pwd)/data/helper.status.json" \
-  > helper.log 2>&1 &
-
-HELPER_PID=$!
-
-echo "Helper PID: $HELPER_PID"
+python helper_bot.py > helper.log 2>&1 &
 
 sleep 10
 
