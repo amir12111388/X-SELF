@@ -592,7 +592,7 @@ class TelegramAccount:
                 "• `راهنما` — راهنمای سریع\n"
                 "• `وضعیت` — وضعیت اجرای سلف\n"
                 "• `پنل` — همه تنظیمات و امکانات\n\n"
-                f"🔮 ارائه‌شده توسط {self.brand_username('brand_powered_by')}"
+                f"🔮 ارائه‌شده توسط {self.brand_username(''https://t.me/SELF_BOT_FPS)}"
             )
             await self.queued_send_message(
                 "me",
