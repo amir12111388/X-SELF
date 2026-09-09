@@ -1,0 +1,10 @@
+python-telegram-bot>=20.7,<22
+Telethon>=1.36,<2
+python-dotenv>=1.0,<2
+psutil>=5.9,<8
+pytz>=2024.1
+requests>=2.31
+Pillow>=10.3,<13
+edge-tts>=7.0,<8
+qrcode[pil]>=7.4,<9
+cryptography>=42,<47
