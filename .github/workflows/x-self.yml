@@ -42,7 +42,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest -q
+          python -m pytest -q -rA
 
 
   run-bots:
