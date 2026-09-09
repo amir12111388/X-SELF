@@ -19,7 +19,7 @@ jobs:
       HELPER_BOT_USERNAME: ${{ secrets.HELPER_BOT_USERNAME }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -34,10 +34,11 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
-      - name: Check required secrets
+      - name: Check Secrets
         run: |
           python - <<'PY'
           import os
+
           required = [
               "BOT_TOKEN",
               "TELEGRAM_API_ID",
@@ -47,32 +48,33 @@ jobs:
               "HELPER_BOT_USERNAME",
           ]
 
-          missing = [x for x in required if not os.getenv(x)]
+          missing = [name for name in required if not os.getenv(name)]
 
           if missing:
               raise SystemExit(
                   "Missing GitHub Secrets: " + ", ".join(missing)
               )
 
-          print("All required secrets are available.")
+          print("All required secrets are configured.")
           PY
 
-      - name: Check repository files
+      - name: Check project files
         run: |
           test -f main_bot.py
           test -f helper_bot.py
           test -f control_store.py
           test -f requirements.txt
-          echo "Repository files OK."
 
-      - name: Initialize application database
+          echo "Project files OK."
+
+      - name: Prepare Helper database
         run: |
           python - <<'PY'
           import os
           from pathlib import Path
 
           from control_store import (
-              init_users_db,
+              ensure_app_settings,
               set_app_settings,
           )
 
@@ -81,51 +83,45 @@ jobs:
 
           db_path = data_dir / "users.db"
 
-          # Create the database/tables using the project's own code.
-          init_users_db(db_path)
+          # Use the project's own database/settings functions.
+          ensure_app_settings(db_path)
 
-          # Configure the Helper through the project's existing
-          # settings mechanism. No project source file is modified.
           set_app_settings(
               db_path,
               {
+                  "helper_enabled": "1",
                   "helper_token": os.environ["HELPER_BOT_TOKEN"],
                   "helper_username": os.environ["HELPER_BOT_USERNAME"],
-                  "helper_enabled": "1",
               },
           )
 
-          print("Helper configuration initialized.")
-          print(f"Database: {db_path}")
+          print("Helper configuration written to data/users.db")
           PY
 
-      - name: Verify Helper configuration
+      - name: Verify Helper database
         run: |
           python - <<'PY'
           from control_store import get_helper_config
 
           config = get_helper_config("data/users.db")
 
-          print("Helper enabled:", config.get("enabled"))
-          print("Helper username:", config.get("username"))
-          print(
-              "Helper token configured:",
-              bool(config.get("token"))
-          )
+          print("Helper enabled:", config["enabled"])
+          print("Helper username:", config["username"])
+          print("Helper token configured:", bool(config["token"]))
 
-          if not config.get("enabled"):
-              raise SystemExit("Helper is not enabled.")
+          if not config["enabled"]:
+              raise SystemExit("Helper is disabled.")
 
-          if not config.get("token"):
+          if not config["token"]:
               raise SystemExit("Helper token is missing.")
 
-          if not config.get("username"):
+          if not config["username"]:
               raise SystemExit("Helper username is missing.")
 
-          print("Helper database configuration OK.")
+          print("Helper database configuration is OK.")
           PY
 
-      - name: Compile Python files
+      - name: Compile project
         continue-on-error: true
         run: |
           python -m compileall -q .
@@ -135,9 +131,11 @@ jobs:
         run: |
           python -m pytest -vv -rA --tb=long
 
-      - name: Start Helper Bot
+      - name: Start Helper
         run: |
           rm -f data/helper.status.json
+          rm -f helper.log
+          rm -f helper.pid
 
           nohup python helper_bot.py \
             --data-dir "$(pwd)/data" \
@@ -149,14 +147,15 @@ jobs:
           echo "Helper PID:"
           cat helper.pid
 
-      - name: Wait for Helper
+      - name: Wait for Helper Ready
         run: |
-          echo "Waiting for Helper to become ready..."
+          echo "Waiting for Helper..."
 
           for i in $(seq 1 30); do
-            echo "Check $i/30"
+            echo "Attempt $i/30"
 
             if [ -f data/helper.status.json ]; then
+              echo "Status file:"
               cat data/helper.status.json
               echo
 
@@ -167,20 +166,22 @@ jobs:
           path = Path("data/helper.status.json")
 
           try:
-              data = json.loads(path.read_text(encoding="utf-8"))
+              status = json.loads(
+                  path.read_text(encoding="utf-8")
+              )
           except Exception:
               raise SystemExit(1)
 
-          print("Status:", data.get("status"))
+          print("Current status:", status.get("status"))
 
-          if data.get("status") == "ready":
+          if status.get("status") == "ready":
+              print("Helper is READY.")
               raise SystemExit(0)
 
           raise SystemExit(1)
           PY
 
               if [ $? -eq 0 ]; then
-                echo "Helper is READY."
                 exit 0
               fi
             fi
@@ -188,21 +189,35 @@ jobs:
             sleep 2
           done
 
-          echo "Helper did not become ready."
-          echo "========== helper.log =========="
+          echo ""
+          echo "========================================"
+          echo "HELPER DID NOT BECOME READY"
+          echo "========================================"
+          echo ""
+
+          echo "----- helper.log -----"
           cat helper.log || true
-          echo "================================"
+
+          echo ""
+          echo "----- helper status -----"
+          cat data/helper.status.json || true
 
           exit 1
 
       - name: Start Main Bot
         run: |
+          echo "Helper is ready."
           echo "Starting main_bot.py..."
+
           python main_bot.py
 
-      - name: Show Helper log
+      - name: Print Helper Log
         if: always()
         run: |
-          echo "========== helper.log =========="
+          echo "========================================"
+          echo "HELPER LOG"
+          echo "========================================"
+
           cat helper.log || true
-          echo "================================"
+
+          echo "========================================"
