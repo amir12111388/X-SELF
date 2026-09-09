@@ -18,32 +18,99 @@ jobs:
       OWNER_ID: ${{ secrets.OWNER_ID }}
 
     steps:
+      # -----------------------------
+      # 1. دریافت سورس از GitHub
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. نصب Python
+      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
 
+      # -----------------------------
+      # 3. آپدیت pip
+      # -----------------------------
       - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip
 
+      # -----------------------------
+      # 4. نصب Requirements
+      # -----------------------------
       - name: Install dependencies
         run: |
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
+      # -----------------------------
+      # 5. بررسی فایل‌های پروژه
+      # -----------------------------
+      - name: Debug repository files
+        run: |
+          echo "================================"
+          echo "CURRENT DIRECTORY"
+          echo "================================"
+          pwd
+
+          echo ""
+          echo "================================"
+          echo "ROOT FILES"
+          echo "================================"
+          ls -la
+
+          echo ""
+          echo "================================"
+          echo "PYTHON FILES"
+          echo "================================"
+          find . -maxdepth 2 -type f -name "*.py" | sort
+
+          echo ""
+          echo "================================"
+          echo "REQUIRED FILE CHECK"
+          echo "================================"
+
+          for file in \
+            main_bot.py \
+            helper_bot.py \
+            self_bot.py \
+            self_features.py \
+            admin_ui.py \
+            admin_center.py \
+            advanced_features.py \
+            control_store.py \
+            db_utils.py \
+            send_queue.py
+          do
+            if [ -f "$file" ]; then
+              echo "OK: $file"
+            else
+              echo "MISSING: $file"
+            fi
+          done
+
+      # -----------------------------
+      # 6. بررسی Syntax تمام Python ها
+      # -----------------------------
       - name: Check Python syntax
         run: |
           python -m compileall -q .
 
+      # -----------------------------
+      # 7. اجرای تست‌ها
+      # -----------------------------
       - name: Run tests
         run: |
-          python -m pytest -q -rA
+          python -m pytest -vv -rA --tb=long
 
+  # ==========================================================
+  # اجرای ربات‌ها
+  # ==========================================================
 
   run-bots:
     name: Run X-SELF
@@ -57,25 +124,38 @@ jobs:
       OWNER_ID: ${{ secrets.OWNER_ID }}
 
     steps:
+      # -----------------------------
+      # 1. Checkout
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Python
+      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
 
+      # -----------------------------
+      # 3. نصب وابستگی‌ها
+      # -----------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
+      # -----------------------------
+      # 4. بررسی Secrets
+      # -----------------------------
       - name: Check configuration
         run: |
           python - <<'PY'
           import os
+          import sys
 
           required = [
               "BOT_TOKEN",
@@ -84,37 +164,76 @@ jobs:
               "OWNER_ID",
           ]
 
-          missing = [x for x in required if not os.getenv(x)]
+          missing = [
+              name for name in required
+              if not os.getenv(name)
+          ]
 
           if missing:
               print("Missing GitHub Secrets:")
               for item in missing:
                   print(f"- {item}")
-              raise SystemExit(1)
+
+              sys.exit(1)
 
           print("All required environment variables are configured.")
           PY
 
+      # -----------------------------
+      # 5. بررسی فایل‌های اصلی
+      # -----------------------------
+      - name: Verify bot files
+        run: |
+          for file in main_bot.py helper_bot.py; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: $file not found!"
+              exit 1
+            fi
+
+            echo "OK: $file"
+          done
+
+      # -----------------------------
+      # 6. اجرای Helper Bot
+      # -----------------------------
       - name: Start helper bot
         run: |
           if [ -f helper_bot.py ]; then
             echo "Starting helper_bot.py..."
-            nohup python helper_bot.py > helper.log 2>&1 &
+
+            nohup python helper_bot.py \
+              > helper.log 2>&1 &
+
             echo $! > helper.pid
+
+            echo "Helper PID:"
+            cat helper.pid
           else
             echo "helper_bot.py not found."
+            exit 1
           fi
 
+      # -----------------------------
+      # 7. صبر برای Helper
+      # -----------------------------
       - name: Wait for helper
         run: |
           sleep 5
 
+          echo "================================"
+          echo "HELPER LOG"
+          echo "================================"
+
           if [ -f helper.log ]; then
-            echo "===== HELPER LOG ====="
             cat helper.log
-            echo "======================"
+          else
+            echo "helper.log was not created."
           fi
 
+      # -----------------------------
+      # 8. اجرای Main Bot
+      # -----------------------------
       - name: Start main bot
         run: |
+          echo "Starting main_bot.py..."
           python main_bot.py
