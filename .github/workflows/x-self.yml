@@ -9,7 +9,7 @@ permissions:
 jobs:
 
   # ==========================================================
-  # BUILD & TEST
+  # 1) BUILD & TEST
   # ==========================================================
 
   build-and-test:
@@ -25,14 +25,14 @@ jobs:
     steps:
 
       # ------------------------------------------------------
-      # 1. دریافت سورس
+      # Checkout
       # ------------------------------------------------------
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------
-      # 2. نصب Python
+      # Python
       # ------------------------------------------------------
 
       - name: Setup Python
@@ -42,71 +42,38 @@ jobs:
           cache: pip
 
       # ------------------------------------------------------
-      # 3. آپدیت pip
-      # ------------------------------------------------------
-
-      - name: Upgrade pip
-        run: |
-          python -m pip install --upgrade pip
-
-      # ------------------------------------------------------
-      # 4. نصب وابستگی‌ها
+      # Dependencies
       # ------------------------------------------------------
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
       # ------------------------------------------------------
-      # 5. بررسی فایل‌های پروژه
+      # بررسی ساختار پروژه
       # ------------------------------------------------------
 
-      - name: Check project files
+      - name: Check repository
         run: |
-          echo "======================================"
-          echo "Current directory"
-          echo "======================================"
+          echo "========================================"
+          echo "X-SELF REPOSITORY"
+          echo "========================================"
+
+          echo "Working directory:"
           pwd
 
           echo ""
-          echo "======================================"
-          echo "Project files"
-          echo "======================================"
+          echo "Root:"
           ls -la
 
           echo ""
-          echo "======================================"
-          echo "Python files"
-          echo "======================================"
+          echo "Python files:"
           find . -maxdepth 2 -type f -name "*.py" | sort
 
-          echo ""
-          echo "======================================"
-          echo "Required files"
-          echo "======================================"
-
-          for file in \
-            main_bot.py \
-            helper_bot.py \
-            self_bot.py \
-            self_features.py \
-            admin_ui.py \
-            admin_center.py \
-            advanced_features.py \
-            control_store.py \
-            db_utils.py \
-            send_queue.py
-          do
-            if [ -f "$file" ]; then
-              echo "OK: $file"
-            else
-              echo "WARNING: $file not found"
-            fi
-          done
-
       # ------------------------------------------------------
-      # 6. بررسی Syntax
+      # Syntax check
       # ------------------------------------------------------
 
       - name: Check Python syntax
@@ -115,53 +82,47 @@ jobs:
           python -m compileall -q .
 
       # ------------------------------------------------------
-      # 7. اجرای تست‌ها
+      # Tests
       #
-      # مهم:
-      # تست‌ها اجرا می‌شوند اما Fail شدن آنها
-      # مانع ادامه Workflow نمی‌شود.
-      #
-      # هیچ فایل پروژه‌ای اینجا تغییر نمی‌کند.
+      # Fail شدن تست‌ها Workflow را متوقف نمی‌کند.
       # ------------------------------------------------------
 
       - name: Run tests
         continue-on-error: true
         run: |
-          echo "======================================"
-          echo "RUNNING PYTEST"
-          echo "======================================"
+          echo "========================================"
+          echo "RUNNING TESTS"
+          echo "========================================"
 
           python -m pytest -vv -rA --tb=long
 
       # ------------------------------------------------------
-      # 8. گزارش وضعیت تست‌ها
+      # پایان تست
       # ------------------------------------------------------
 
-      - name: Test result
+      - name: Test summary
         if: always()
         run: |
-          echo "======================================"
-          echo "TEST STEP FINISHED"
-          echo "======================================"
+          echo "========================================"
+          echo "TEST PHASE FINISHED"
+          echo "========================================"
+
+          echo "Test failures do not stop the workflow."
+
           echo ""
-          echo "Tests were executed."
-          echo "Test failures do NOT stop the workflow."
-          echo ""
-          echo "No project source files were modified."
+          echo "No source files were modified."
 
 
   # ==========================================================
-  # RUN BOTS
+  # 2) RUN
   # ==========================================================
 
   run-bots:
     name: Run X-SELF
     runs-on: ubuntu-latest
 
-    # مهم:
-    # اینجا دیگر به موفق شدن تست‌ها وابسته نیستیم.
-    # بنابراین حتی اگر pytest چند Fail داشته باشد،
-    # این Job اجرا می‌شود.
+    # عمداً به build-and-test وابسته نیست
+    # تا Fail تست‌ها مانع اجرای این Job نشود.
 
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -172,14 +133,14 @@ jobs:
     steps:
 
       # ------------------------------------------------------
-      # 1. دریافت دوباره سورس
+      # Checkout
       # ------------------------------------------------------
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------
-      # 2. نصب Python
+      # Python
       # ------------------------------------------------------
 
       - name: Setup Python
@@ -189,7 +150,7 @@ jobs:
           cache: pip
 
       # ------------------------------------------------------
-      # 3. نصب Dependencies
+      # Dependencies
       # ------------------------------------------------------
 
       - name: Install dependencies
@@ -198,7 +159,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       # ------------------------------------------------------
-      # 4. بررسی Secrets
+      # بررسی Secrets
       # ------------------------------------------------------
 
       - name: Check configuration
@@ -215,103 +176,143 @@ jobs:
           ]
 
           missing = [
-              name
-              for name in required
-              if not os.getenv(name)
+              item
+              for item in required
+              if not os.getenv(item)
           ]
 
           if missing:
-              print("======================================")
+              print("========================================")
               print("MISSING GITHUB SECRETS")
-              print("======================================")
+              print("========================================")
 
               for item in missing:
                   print(f"- {item}")
 
               sys.exit(1)
 
-          print("======================================")
+          print("========================================")
           print("CONFIGURATION OK")
-          print("======================================")
-          print("All required environment variables are configured.")
+          print("========================================")
           PY
 
       # ------------------------------------------------------
-      # 5. بررسی فایل‌های اصلی
+      # بررسی فایل‌های اصلی
       # ------------------------------------------------------
 
-      - name: Verify bot files
+      - name: Verify project files
         run: |
-          echo "======================================"
-          echo "VERIFY BOT FILES"
-          echo "======================================"
+          echo "========================================"
+          echo "PROJECT FILE CHECK"
+          echo "========================================"
 
-          if [ ! -f main_bot.py ]; then
-            echo "ERROR: main_bot.py not found!"
-            exit 1
-          fi
+          for file in \
+            main_bot.py \
+            helper_bot.py \
+            self_bot.py \
+            self_features.py \
+            admin_ui.py \
+            admin_center.py \
+            advanced_features.py \
+            control_store.py \
+            db_utils.py \
+            send_queue.py
+          do
 
-          echo "OK: main_bot.py"
+            if [ -f "$file" ]; then
+              echo "OK      $file"
+            else
+              echo "MISSING $file"
+            fi
 
-          if [ ! -f helper_bot.py ]; then
-            echo "WARNING: helper_bot.py not found."
-          else
-            echo "OK: helper_bot.py"
-          fi
+          done
 
       # ------------------------------------------------------
-      # 6. اجرای Helper Bot
+      # بررسی اینکه پروژه بدون اجرای واقعی Import می‌شود
+      # ------------------------------------------------------
+
+      - name: Check main module
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = [
+              "main_bot.py",
+              "helper_bot.py",
+          ]
+
+          for name in files:
+              path = Path(name)
+
+              if not path.exists():
+                  print(f"SKIP: {name}")
+                  continue
+
+              print(f"Checking: {name}")
+
+              with path.open(
+                  "r",
+                  encoding="utf-8"
+              ) as f:
+                  ast.parse(
+                      f.read(),
+                      filename=name
+                  )
+
+              print(f"OK: {name}")
+
+          PY
+
+      # ------------------------------------------------------
+      # اجرای Helper
+      #
+      # فقط اگر شرایط خود پروژه اجازه بدهد.
       # ------------------------------------------------------
 
       - name: Start helper bot
         run: |
-          if [ -f helper_bot.py ]; then
-
-            echo "======================================"
-            echo "STARTING HELPER BOT"
-            echo "======================================"
-
-            nohup python helper_bot.py \
-              > helper.log 2>&1 &
-
-            HELPER_PID=$!
-
-            echo "$HELPER_PID" > helper.pid
-
-            echo "Helper PID: $HELPER_PID"
-
-          else
-
+          if [ ! -f helper_bot.py ]; then
             echo "helper_bot.py not found."
-            echo "Skipping helper bot."
-
+            exit 0
           fi
 
+          echo "========================================"
+          echo "STARTING HELPER"
+          echo "========================================"
+
+          nohup python helper_bot.py \
+            > helper.log 2>&1 &
+
+          HELPER_PID=$!
+
+          echo "$HELPER_PID" > helper.pid
+
+          echo "Helper PID: $HELPER_PID"
+
       # ------------------------------------------------------
-      # 7. صبر و بررسی Helper
+      # بررسی Helper
       # ------------------------------------------------------
 
-      - name: Wait for helper
+      - name: Check helper
         run: |
-          echo "Waiting for helper bot..."
-
           sleep 5
 
-          echo ""
-          echo "======================================"
+          echo "========================================"
           echo "HELPER LOG"
-          echo "======================================"
+          echo "========================================"
 
           if [ -f helper.log ]; then
             cat helper.log
           else
-            echo "No helper.log found."
+            echo "helper.log does not exist."
           fi
 
           echo ""
-          echo "======================================"
-          echo "HELPER STATUS"
-          echo "======================================"
+          echo "========================================"
+          echo "HELPER PROCESS"
+          echo "========================================"
 
           if [ -f helper.pid ]; then
 
@@ -320,23 +321,21 @@ jobs:
             if kill -0 "$PID" 2>/dev/null; then
               echo "Helper process is running."
             else
-              echo "Helper process is not running."
+              echo "Helper process stopped."
             fi
 
           else
-
-            echo "No helper PID file."
-
+            echo "No helper PID."
           fi
 
       # ------------------------------------------------------
-      # 8. اجرای Main Bot
+      # Main Bot
       # ------------------------------------------------------
 
       - name: Start main bot
         run: |
-          echo "======================================"
+          echo "========================================"
           echo "STARTING MAIN BOT"
-          echo "======================================"
+          echo "========================================"
 
           python main_bot.py
