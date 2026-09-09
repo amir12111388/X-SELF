@@ -1,14 +1,20 @@
-name: Test X-SELF
+name: X-SELF Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  run-bot:
     runs-on: ubuntu-latest
 
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+      OWNER_ID: ${{ secrets.OWNER_ID }}
+
     steps:
-      - name: Checkout
+      - name: Download repository
         uses: actions/checkout@v6
 
       - name: Setup Python
@@ -21,6 +27,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Start bot
         run: |
-          pytest -q
+          python main_bot.py
